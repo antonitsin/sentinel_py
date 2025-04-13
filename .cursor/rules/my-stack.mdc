@@ -1,0 +1,10 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# Technical stack
+
+- Python
+- when ask to write SQL use Presto as a default SQL flavor
