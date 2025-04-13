@@ -22,7 +22,7 @@ pip install causal_survey_analyzer
 Or install from source:
 
 ```bash
-git clone https://github.com/yourusername/causal_survey_analyzer.git
+git clone https://github.com/antonitsin/causal_survey_analyzer.git
 cd causal_survey_analyzer
 pip install -e .
 ```
@@ -43,11 +43,11 @@ pip install -e .
 import pandas as pd
 import matplotlib.pyplot as plt
 from causal_survey_analyzer import (
-    check_response_encoding,
-    check_data_abnormalities,
-    compute_post_stratification_weights,
-    run_causal_analysis,
-    visualize_effects
+    ResponseValidator,
+    DataValidator,
+    PostStratificationWeightCalculator,
+    CausalEstimator,
+    EffectVisualizer
 )
 
 # Sample A/B Test Data
@@ -71,26 +71,31 @@ pop_data = pd.DataFrame({
 # Validate encoding
 encoding_map = {'q1': {'Strongly Agree': 5, 'Agree': 4}, 
                 'q2': {'Agree': 4, 'Disagree': 2}}
-mapping = check_response_encoding(ab_data, 'question', 'raw_response', 'score', encoding_map)
+response_validator = ResponseValidator()
+mapping = response_validator.validate_encoding(ab_data, 'question', 'raw_response', 'score', encoding_map)
 
 # Check for data issues
-issues = check_data_abnormalities(ab_data, 'ab', ['question', 'score', 'treatment'], 'userid', 'treatment')
+data_validator = DataValidator()
+issues = data_validator.check_abnormalities(ab_data, 'ab', ['question', 'score', 'treatment'], 'userid', 'treatment')
 if issues:
     print("Data issues found:", issues)
 else:
     print("No data issues found.")
 
 # Apply population weights
-ab_data['weights'] = compute_post_stratification_weights(ab_data, pop_data, ['age', 'gender'])
+weight_calculator = PostStratificationWeightCalculator()
+ab_data['weights'] = weight_calculator.compute_weights(ab_data, pop_data, ['age', 'gender'])
 
 # Run analysis
-results = run_causal_analysis(
+estimator = CausalEstimator()
+results = estimator.run_analysis(
     ab_data, 'ab', 'question', 'score', 'treatment', 
     covariates=['age'], weights_col='weights'
 )
 
 # Visualize results
-fig = visualize_effects(results, 'ab', breakdown_col='gender', data=ab_data)
+visualizer = EffectVisualizer()
+fig = visualizer.visualize_effects(results, 'ab', breakdown_col='gender', data=ab_data)
 plt.show()
 ```
 
@@ -110,13 +115,15 @@ did_data = pd.DataFrame({
 })
 
 # Run DiD analysis
-results_did = run_causal_analysis(
+estimator = CausalEstimator()
+results_did = estimator.run_analysis(
     did_data, 'did', 'question', 'score', 'treatment', 'time', 
     covariates=['age']
 )
 
 # Visualize DiD results
-fig_did = visualize_effects(results_did, 'did')
+visualizer = EffectVisualizer()
+fig_did = visualizer.visualize_effects(results_did, 'did')
 plt.show()
 ```
 
@@ -124,7 +131,7 @@ plt.show()
 
 ### Data Validation
 
-#### `check_response_encoding(data, question_col, raw_response_col, score_col, encoding_map=None)`
+#### `ResponseValidator.validate_encoding(data, question_col, raw_response_col, score_col, encoding_map=None)`
 
 Verifies that raw responses are correctly mapped to scores for each question.
 
@@ -138,7 +145,7 @@ Verifies that raw responses are correctly mapped to scores for each question.
 **Returns:** 
 - dict of validated mappings per question.
 
-#### `check_data_abnormalities(data, design, required_cols, userid_col, treatment_col, time_col=None)`
+#### `DataValidator.check_abnormalities(data, design, required_cols, userid_col, treatment_col, time_col=None)`
 
 Detects potential issues in the data.
 
@@ -155,7 +162,7 @@ Detects potential issues in the data.
 
 ### Analysis
 
-#### `run_causal_analysis(data, design, question_col, outcome_col, treatment_col, time_col=None, covariates=None, weights_col=None, synth_pre_periods=None)`
+#### `CausalEstimator.run_analysis(data, design, question_col, outcome_col, treatment_col, time_col=None, covariates=None, weights_col=None, synth_pre_periods=None)`
 
 Runs causal effect estimation for the specified design.
 
@@ -175,7 +182,7 @@ Runs causal effect estimation for the specified design.
 
 ### Population Correction
 
-#### `compute_post_stratification_weights(sample_data, population_data, variables)`
+#### `PostStratificationWeightCalculator.compute_weights(sample_data, population_data, variables)`
 
 Computes post-stratification weights based on population data.
 
@@ -189,12 +196,12 @@ Computes post-stratification weights based on population data.
 
 ### Visualization
 
-#### `visualize_effects(results, design, breakdown_col=None, data=None, confidence_level=0.9)`
+#### `EffectVisualizer.visualize_effects(results, design, breakdown_col=None, data=None, confidence_level=0.9)`
 
 Visualizes treatment effects as lifts with confidence intervals.
 
 **Parameters:**
-- `results` (dict): Output from run_causal_analysis.
+- `results` (dict): Output from CausalEstimator.run_analysis.
 - `design` (str): Analysis design (e.g., 'ab', 'did').
 - `breakdown_col` (str, optional): Column for subgroup analysis (e.g., gender).
 - `data` (pd.DataFrame, optional): Required if breakdown_col is provided.
